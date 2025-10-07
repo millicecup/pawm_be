@@ -30,19 +30,32 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // CORS configuration - Allow multiple frontend ports
+// CORS configuration - Allow multiple frontend ports
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001', 
   'http://localhost:3002',
-  'https://fisika-simulator.vercel.app/',
+  'http://localhost:3003',
+  'https://fisika-simulator.vercel.app',  // ← Frontend production URL!
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 // Session middleware (for OAuth) with fallback to memory store
 console.log('Setting up session store... (testing MongoDB connection)');
 app.use(session({
