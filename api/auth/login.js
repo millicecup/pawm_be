@@ -42,34 +42,45 @@ export default async function handler(req, res) {
 
     console.log('=== LOGIN DEBUG ===');
     console.log('Login attempt for email:', email);
-    console.log('User model available:', !!User);
 
-    // Validation
-    if (!email || !password) {
-      console.log('Missing email or password');
-      return res.status(400).json({ message: 'Email and password are required' });
-    }
-
-    // Find user
-    console.log('Searching for user with email:', email);
+    // Find user - try different approach
+    console.log('Searching for user...');
     const user = await User.findOne({ 
-      email: email.toLowerCase() 
-    }).select('+password');
+        $or: [
+        { email: email },
+        { email: email.toLowerCase() }
+        ]
+    });
     
     if (!user) {
-      console.log('User not found');
-      return res.status(401).json({ message: 'Invalid credentials' });
+        console.log('User not found in database');
+        return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    console.log('User found:', user.email);
+    console.log('User found:', {
+        id: user._id,
+        email: user.email,
+        hasPassword: !!user.password,
+        passwordLength: user.password ? user.password.length : 0
+    });
+
+    // Check if password field exists
+    if (!user.password) {
+        console.log('ERROR: User found but no password field!');
+        return res.status(500).json({ message: 'User data corrupted' });
+    }
 
     // Check password
-    console.log('Verifying password...');
+    console.log('Comparing passwords...');
+    console.log('Input password:', password);
+    console.log('Stored hash length:', user.password.length);
+    
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('Password comparison result:', isPasswordValid);
     
     if (!isPasswordValid) {
-      console.log('Password invalid');
-      return res.status(401).json({ message: 'Invalid credentials' });
+        console.log('Password comparison failed');
+        return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     console.log('Password verified successfully');

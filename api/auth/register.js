@@ -1,48 +1,30 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-
-// Import model - check if this path is correct
 const User = require('../../src/models/User');
 
 export default async function handler(req, res) {
-  // CORS headers (multiple origins)
-  const allowedOrigins = [
-    'https://fisika-simulator.vercel.app',
-    'http://localhost:3002',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-  
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
+  // Handle preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    // ENSURE DATABASE CONNECTION
-    if (mongoose.connection.readyState !== 1) {
-      console.log('Connecting to MongoDB...');
-      await mongoose.connect(process.env.MONGODB_URI);
-      console.log('MongoDB connected');
-    }
-
     const { name, email, password } = req.body;
 
     console.log('=== REGISTRATION DEBUG ===');
     console.log('Registering with email:', email);
-    console.log('User model available:', !!User);
+    console.log('Password length:', password ? password.length : 0);
+    console.log('Password to hash:', JSON.stringify(password));
 
     // Validation
     if (!name || !email || !password) {
@@ -50,7 +32,6 @@ export default async function handler(req, res) {
     }
 
     // Check if user already exists
-    console.log('Checking for existing user...');
     const existingUser = await User.findOne({ 
       $or: [
         { email: email },
@@ -59,17 +40,18 @@ export default async function handler(req, res) {
     });
     
     if (existingUser) {
-      console.log('User already exists');
       return res.status(400).json({ message: 'User already exists' });
     }
 
     // Hash password
-    console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 12);
     console.log('Password hashed successfully');
 
+    // Test the hash immediately after creation
+    const immediateTest = await bcrypt.compare(password, hashedPassword);
+    console.log('Immediate hash test:', immediateTest);
+
     // Create new user
-    console.log('Creating user...');
     const user = new User({
       name,
       email: email.toLowerCase(),
@@ -78,17 +60,21 @@ export default async function handler(req, res) {
     });
 
     await user.save();
-    console.log('User saved successfully');
+    console.log('User saved with email:', user.email);
+
+    // Test the hash after saving to database
+    const savedUser = await User.findOne({ email: user.email });
+    console.log('Hash in database after save:', savedUser.password);
+    const afterSaveTest = await bcrypt.compare(password, savedUser.password);
+    console.log('After save hash test:', afterSaveTest);
+    console.log('=== END REGISTRATION DEBUG ===');
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      process.env.JWT_SECRET || 'shower',
+      process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
-
-    console.log('Registration successful');
-    console.log('=== END REGISTRATION DEBUG ===');
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -100,12 +86,7 @@ export default async function handler(req, res) {
       }
     });
   } catch (error) {
-    console.error('Detailed registration error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      message: 'Server error during registration',
-      error: error.message, // Include actual error for debugging
-      stack: error.stack?.substring(0, 200) // Limited stack trace
-    });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
   }
 }
