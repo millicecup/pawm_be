@@ -34,6 +34,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001', 
   'http://localhost:3002',
+  'https://fisika-simulator.vercel.app/',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -151,12 +152,9 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
     console.log(`🗄️  Database: ${isMongoConnected ? 'Connected' : 'Demo Mode'}`);
     console.log(`\n💡 Make sure your frontend is configured to use: http://localhost:${PORT}\n`);
-});
-
-
-// For Vercel serverless deployment
-module.exports = app;
+  });
 }
 
 // For Vercel serverless deployment
 module.exports = app;
+
