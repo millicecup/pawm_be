@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "physics-lab-backend",
   "builds": [
     {
       "src": "src/server.js",
@@ -9,20 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "src/server.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "src/server.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "functions": {
-    "src/server.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
