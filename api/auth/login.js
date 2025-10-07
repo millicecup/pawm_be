@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../../src/models/User');
 
 export default async function handler(req, res) {
@@ -19,6 +20,12 @@ export default async function handler(req, res) {
   }
 
   try {
+
+    if (mongoose.connection.readyState !== 1) {
+      console.log('Connecting to MongoDB...');
+      await mongoose.connect(process.env.MONGODB_URI);
+      console.log('MongoDB connected successfully');
+    }
     const { email, password } = req.body;
 
     console.log('=== LOGIN DEBUG ===');
