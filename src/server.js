@@ -44,7 +44,7 @@ app.use(cors({
 }));
 
 // Session middleware (for OAuth) with fallback to memory store
-console.log('📝 Setting up session store... (testing MongoDB connection)');
+console.log('Setting up session store... (testing MongoDB connection)');
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret',
   resave: false,
@@ -78,17 +78,17 @@ const connectToMongoDB = async () => {
       serverSelectionTimeoutMS: 3000,
       connectTimeoutMS: 3000,
     });
-    console.log('✅ Connected to MongoDB - Full features available');
+    console.log('Connected to MongoDB - Full features available');
     isMongoConnected = true;
   } catch (err) {
-    console.log('\n🔶 MongoDB not available - Running in demo mode');
-    console.log('📱 Frontend simulations work perfectly without database');
-    console.log('⚠️  User authentication and progress saving disabled');
-    console.log('\n💡 To enable full features:');
-    console.log('   🌐 Option 1: Use MongoDB Atlas (recommended)');
+    console.log('\nMongoDB not available - Running in demo mode');
+    console.log('Frontend simulations work perfectly without database');
+    console.log('User authentication and progress saving disabled');
+    console.log('\nTo enable full features:');
+    console.log('   Option 1: Use MongoDB Atlas (recommended)');
     console.log('      → Go to https://cloud.mongodb.com');
     console.log('      → Create free account and get connection string');
-    console.log('   💻 Option 2: Install MongoDB locally');
+    console.log('   Option 2: Install MongoDB locally');
     console.log('      → Download from https://www.mongodb.com/try/download/community\n');
     
     isMongoConnected = false;
@@ -148,10 +148,10 @@ const PORT = process.env.PORT || 5000;
 // For local development
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
-    console.log(`\n🚀 Backend API running on: http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🗄️  Database: ${isMongoConnected ? 'Connected' : 'Demo Mode'}`);
-    console.log(`\n💡 Make sure your frontend is configured to use: http://localhost:${PORT}\n`);
+    console.log(`\nBackend API running on: http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`Database: ${isMongoConnected ? 'Connected' : 'Demo Mode'}`);
+    console.log(`\nMake sure your frontend is configured to use: http://localhost:${PORT}\n`);
   });
 }
 
