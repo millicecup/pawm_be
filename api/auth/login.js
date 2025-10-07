@@ -1,30 +1,48 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+
+// Import User model - check this path matches your register.js
 const User = require('../../src/models/User');
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS headers (multiple origins)
+  const allowedOrigins = [
+    'https://fisika-simulator.vercel.app',
+    'http://localhost:3002',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
+    // ENSURE DATABASE CONNECTION
+    if (mongoose.connection.readyState !== 1) {
+      console.log('Connecting to MongoDB...');
+      await mongoose.connect(process.env.MONGODB_URI);
+      console.log('MongoDB connected for login');
+    }
+
     const { email, password } = req.body;
 
     console.log('=== LOGIN DEBUG ===');
-    console.log('Received email:', email);
-    console.log('Received password:', password ? 'PROVIDED' : 'MISSING');
-    console.log('Password length:', password ? password.length : 0);
+    console.log('Login attempt for email:', email);
+    console.log('User model available:', !!User);
 
     // Validation
     if (!email || !password) {
@@ -34,105 +52,58 @@ export default async function handler(req, res) {
 
     // Find user
     console.log('Searching for user with email:', email);
-    let user;
-    try {
-      user = await User.findOne({ email });
-      console.log('First search result:', user ? 'FOUND' : 'NOT FOUND');
-      
-      if (!user) {
-        console.log('User not found with original email, trying lowercase...');
-        user = await User.findOne({ email: email.toLowerCase() });
-        console.log('Lowercase search result:', user ? 'FOUND' : 'NOT FOUND');
-      }
-    } catch (dbError) {
-      console.error('Database search error:', dbError);
-      return res.status(500).json({ message: 'Database error' });
-    }
+    const user = await User.findOne({ 
+      email: email.toLowerCase() 
+    }).select('+password');
     
-    console.log('Final user result:', user ? 'YES' : 'NO');
-    if (user) {
-      console.log('User email in DB:', user.email);
-      console.log('User has password:', user.password ? 'YES' : 'NO');
-      console.log('User auth provider:', user.authProvider);
-      if (user.password) {
-        console.log('Password hash length:', user.password.length);
-        console.log('Password hash starts with:', user.password.substring(0, 10));
-      }
-    }
-
     if (!user) {
-      console.log('Returning 401 - user not found');
+      console.log('User not found');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check if user registered with OAuth
-    if (!user.password) {
-      console.log('User has no password - OAuth user');
-      return res.status(401).json({ 
-        message: `This account was registered with ${user.authProvider}. Please use ${user.authProvider} to login.` 
-      });
-    }
+    console.log('User found:', user.email);
 
-    // Verify password with working workaround
-    console.log('About to compare passwords...');
-    console.log('Raw password from request:', JSON.stringify(password));
-    console.log('Password type:', typeof password);
+    // Check password
+    console.log('Verifying password...');
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     
-    let isValidPassword;
-    try {
-      isValidPassword = await bcrypt.compare(password, user.password);
-      console.log('bcrypt.compare result:', isValidPassword);
-    } catch (bcryptError) {
-      console.error('Bcrypt comparison error:', bcryptError);
-      return res.status(500).json({ message: 'Password verification error' });
-    }
-
-    if (!isValidPassword) {
-      console.log('Normal comparison failed, trying workaround...');
-      
-      // WORKING WORKAROUND: Re-hash and compare with fresh hash
-      const tempHash = await bcrypt.hash(password, 12);
-      const tempResult = await bcrypt.compare(password, tempHash);
-      console.log('Temp hash works:', tempResult);
-      
-      // If bcrypt works with fresh hash, update the user's password
-      if (tempResult) {
-        console.log('Updating user password with fresh hash...');
-        user.password = tempHash;
-        await user.save();
-        isValidPassword = true;
-        console.log('Password updated successfully');
-      }
-    }
-
-    if (!isValidPassword) {
-      console.log('Password comparison failed - returning 401');
+    if (!isPasswordValid) {
+      console.log('Password invalid');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    console.log('Password verified successfully');
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'shower',
       { expiresIn: '24h' }
     );
 
-    console.log('Login successful for user:', user.email);
-    console.log('=== END LOGIN DEBUG ===');
+    console.log('JWT token generated successfully');
+    console.log('=== LOGIN SUCCESS ===');
 
-    res.json({
+    res.status(200).json({
       message: 'Login successful',
       token,
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
-        avatar: user.avatar
+        email: user.email
       }
     });
   } catch (error) {
-    console.error('Outer login error:', error);
-    console.log('=== LOGIN DEBUG FAILED ===');
-    res.status(500).json({ message: 'Server error during login' });
+    console.error('Detailed login error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Database error',
+      error: error.message,
+      debug: {
+        mongoConnected: mongoose.connection.readyState === 1,
+        userModelExists: !!User
+      }
+    });
   }
 }
