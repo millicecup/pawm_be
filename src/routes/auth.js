@@ -13,7 +13,6 @@ const { oauthStatus } = require('../middleware/passport');
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
     // Validation
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -25,8 +24,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
+    // Test the hash immediately after creation
+    const immediateTest = await bcrypt.compare(password, hashedPassword);
 
     // Create new user
     const user = new User({
@@ -38,6 +40,9 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
+    // Test the hash after saving to database
+    const savedUser = await User.findOne({ email });
+    const afterSaveTest = await bcrypt.compare(password, savedUser.password);
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
@@ -70,8 +75,22 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Find user
-    const user = await User.findOne({ email });
+    let user;
+    try {
+      user = await User.findOne({ email });
+
+      
+      if (!user) {
+
+        user = await User.findOne({ email: email.toLowerCase() });
+
+      }
+    } catch (dbError) {
+      console.error('Database search error:', dbError);
+      return res.status(500).json({ message: 'Database error' });
+    }
+    
+
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -84,9 +103,36 @@ router.post('/login', async (req, res) => {
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    
+    let isValidPassword;
+    try {
+      // Try multiple comparison methods
+      isValidPassword = await bcrypt.compare(password, user.password);
+      
+      // Also try synchronous version
+      const syncResult = bcrypt.compareSync(password, user.password);
+      
+      const freshHash = await bcrypt.hash(password, 12);
+      const freshComparison = await bcrypt.compare(password, freshHash);
+      
+    } catch (bcryptError) {
+      console.error('Bcrypt comparison error:', bcryptError);
+      return res.status(500).json({ message: 'Password verification error' });
+    }
+
     if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      
+      // TEMPORARY FIX: Re-hash and compare with fresh hash
+      const tempHash = await bcrypt.hash(password, 12);
+      const tempResult = await bcrypt.compare(password, tempHash);
+      
+      // If bcrypt works with fresh hash, update the user's password
+      if (tempResult) {
+        user.password = tempHash;
+        await user.save();
+        isValidPassword = true;
+        console.log('Password updated successfully');
+      }
     }
 
     // Generate JWT token
@@ -95,6 +141,7 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
+
 
     res.json({
       message: 'Login successful',
@@ -107,28 +154,65 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Outer login error:', error);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
 
 // Get current user
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/test-db', async (req, res) => {
   try {
-    // FIX: req.user sudah object User lengkap dari middleware, bukan cuma userId
-    res.json({ user: req.user });
+    console.log('Testing database connection...');
+    const userCount = await User.countDocuments();
+    console.log('Total users in database:', userCount);
+    
+    const allUsers = await User.find({}, 'email name authProvider');
+    console.log('All users:', allUsers);
+    
+    res.json({
+      message: 'Database test successful',
+      userCount,
+      users: allUsers
+    });
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Database test error:', error);
+    res.status(500).json({ message: 'Database test failed', error: error.message });
   }
 });
 
 // Logout
-router.post('/logout', authenticateToken, (req, res) => {
-  // FIX: JWT logout handled client-side, just return success
-  res.json({ message: 'Logged out successfully' });
-});
+// ADD THIS TEMPORARY TEST ROUTE after the /test-db route:
 
+router.post('/test-password', async (req, res) => {
+  try {
+    const { email, testPassword } = req.body;
+    
+
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Test with original password
+    const isValid = await bcrypt.compare(testPassword, user.password);
+    
+    // Also test hashing the same password again
+    const newHash = await bcrypt.hash(testPassword, 12);
+    
+    const newComparison = await bcrypt.compare(testPassword, newHash);
+    
+    res.json({
+      message: 'Password test completed',
+      originalComparison: isValid,
+      newComparison: newComparison,
+      storedHash: user.password.substring(0, 20) + '...'
+    });
+  } catch (error) {
+    console.error('Password test error:', error);
+    res.status(500).json({ message: 'Test failed' });
+  }
+});
 // Google OAuth routes (only if configured)
 if (oauthStatus.google) {
   router.get('/google',

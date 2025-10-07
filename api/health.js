@@ -5,3 +5,4 @@ export default function handler(req, res) {
     message: "Serverless backend running on Vercel yay!"
   });
 }
+
