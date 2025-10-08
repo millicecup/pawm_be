@@ -1,3 +1,5 @@
+import { prisma } from '../../../lib/prisma';
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,22 +15,56 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Mock data for now - replace with actual logic later
+    // Replace with actual logic to fetch stats from your database
+    // Example using Prisma ORM (adjust according to your DB and schema)
+
+    // Total simulations
+    const totalSimulations = await prisma.simulation.count();
+
+    // Completed simulations
+    const completedSimulations = await prisma.simulation.count({
+      where: { status: 'COMPLETED' }
+    });
+
+    // Average score
+    const avgScoreResult = await prisma.simulation.aggregate({
+      _avg: { score: true }
+    });
+    const averageScore = avgScoreResult._avg.score || 0;
+
+    // Total time spent (assuming 'duration' field in minutes)
+    const totalTimeResult = await prisma.simulation.aggregate({
+      _sum: { duration: true }
+    });
+    const totalTimeSpent = totalTimeResult._sum.duration || 0;
+
+    // Recent activity (last 3 days)
+    const recentActivity = await prisma.simulation.groupBy({
+      by: ['date'],
+      _count: { _all: true },
+      _avg: { score: true },
+      orderBy: { date: 'desc' },
+      take: 3
+    });
+
+    // Top scores (top 3)
+    const topScores = await prisma.simulation.findMany({
+      orderBy: { score: 'desc' },
+      take: 3,
+      select: { simulation: true, score: true, date: true }
+    });
+
     const stats = {
-      totalSimulations: 15,
-      completedSimulations: 12,
-      averageScore: 87.5,
-      totalTimeSpent: 340, // in minutes
-      recentActivity: [
-        { date: '2025-10-07', simulations: 3, score: 92 },
-        { date: '2025-10-06', simulations: 2, score: 85 },
-        { date: '2025-10-05', simulations: 4, score: 90 }
-      ],
-      topScores: [
-        { simulation: 'Pendulum', score: 95, date: '2025-10-07' },
-        { simulation: 'Projectile Motion', score: 90, date: '2025-10-06' },
-        { simulation: 'Wave Physics', score: 88, date: '2025-10-05' }
-      ]
+      totalSimulations,
+      completedSimulations,
+      averageScore,
+      totalTimeSpent,
+      recentActivity: recentActivity.map(item => ({
+        date: item.date,
+        simulations: item._count._all,
+        score: item._avg.score
+      })),
+      topScores
     };
 
     res.status(200).json(stats);
