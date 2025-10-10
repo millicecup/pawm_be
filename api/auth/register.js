@@ -36,8 +36,6 @@ async function handler(req, res) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password - SIMPLE: just use bcrypt with 10 rounds
-    const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
 
     // Create user
