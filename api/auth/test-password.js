@@ -1,7 +1,10 @@
 const bcrypt = require('bcryptjs');
 const User = require('../../src/models/User');
+const { allowCors } = require('../_cors');
 
 export default async function handler(req, res) {
+  allowCors(req, res);
+
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

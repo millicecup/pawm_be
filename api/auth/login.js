@@ -2,8 +2,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../../src/models/User');
+const { allowCors } = require('../_cors');
 
 export default async function handler(req, res) {
+  allowCors(req, res);
+
   // Set CORS headers - use specific origin in production
   const allowedOrigins = [
     'http://localhost:3002',
