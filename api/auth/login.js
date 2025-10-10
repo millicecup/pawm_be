@@ -4,30 +4,7 @@ const mongoose = require('mongoose');
 const User = require('../../src/models/User');
 const { allowCors } = require('../_cors');
 
-export default async function handler(req, res) {
-  allowCors(req, res);
-
-  // Set CORS headers - use specific origin in production
-  const allowedOrigins = [
-    'http://localhost:3002',
-    'http://localhost:3001', 
-    'https://fisika-simulator.vercel.app'
-  ];
-  
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // Handle preflight request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
+async function handler(req, res) {
   // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -53,7 +30,7 @@ export default async function handler(req, res) {
     const user = await User.findOne({ 
       email: { $regex: new RegExp(`^${email}$`, 'i') }
     });
-
+    
     if (!user) {
       console.log('User not found:', email);
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -99,3 +76,5 @@ export default async function handler(req, res) {
     res.status(500).json({ message: 'Server error during login' });
   }
 }
+
+module.exports = allowCors(handler);

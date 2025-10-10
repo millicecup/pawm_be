@@ -4,89 +4,62 @@ const mongoose = require('mongoose');
 const User = require('../../src/models/User');
 const { allowCors } = require('../_cors');
 
-export default async function handler(req, res) {
-  allowCors(req, res);
-
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Handle preflight request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Only allow POST
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
     if (mongoose.connection.readyState !== 1) {
-      console.log('Connecting to MongoDB...');
       await mongoose.connect(process.env.MONGODB_URI);
-      console.log('MongoDB connected successfully');
     }
-    const { name, email, password } = req.body;
 
-    console.log('=== REGISTRATION DEBUG ===');
-    console.log('Registering with email:', email);
-    console.log('Password length:', password ? password.length : 0);
-    console.log('Password to hash:', JSON.stringify(password));
+    const { email, password, name } = req.body;
+
+    console.log('Register attempt:', email);
 
     // Validation
-    if (!name || !email || !password) {
+    if (!email || !password || !name) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Check if user already exists
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Check if user exists
     const existingUser = await User.findOne({ 
-      $or: [
-        { email: email },
-        { email: email.toLowerCase() }
-      ]
+      email: { $regex: new RegExp(`^${email}$`, 'i') }
     });
-    
+
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Hash password - SIMPLE: just use bcrypt with 10 rounds
+    const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
 
-    // Test the hash immediately after creation
-    const immediateTest = await bcrypt.compare(password, hashedPassword);
-    console.log('Immediate hash test:', immediateTest);
-
-    // Create new user
+    // Create user
     const user = new User({
-      name,
       email: email.toLowerCase(),
       password: hashedPassword,
+      name,
       authProvider: 'local'
     });
 
     await user.save();
-    console.log('User saved with email:', user.email);
+    console.log('User created:', user.email);
 
-    // Test the hash after saving to database
-    const savedUser = await User.findOne({ email: user.email });
-    console.log('Hash in database after save:', savedUser.password);
-    const afterSaveTest = await bcrypt.compare(password, savedUser.password);
-    console.log('After save hash test:', afterSaveTest);
-    console.log('=== END REGISTRATION DEBUG ===');
-
-    // Generate JWT token
+    // Generate token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'Registration successful',
       token,
       user: {
         id: user._id,
@@ -99,3 +72,5 @@ export default async function handler(req, res) {
     res.status(500).json({ message: 'Server error during registration' });
   }
 }
+
+module.exports = allowCors(handler);
