@@ -1,6 +1,19 @@
-# Physics Lab Backend
+# Virtual Physics Lab - Backend API
 
-Backend API for the Physics Virtual Lab application.
+Backend server for the Virtual Physics Lab application, providing authentication, user management, and progress tracking services.
+
+## Live API
+
+- **Production**: [https://vlab-backend.vercel.app](https://vlab-backend.vercel.app)
+- **Health Check**: [https://vlab-backend.vercel.app/api/health](https://vlab-backend.vercel.app/api/health)
+
+## Technology Stack
+
+- **Runtime**: Node.js serverless functions
+- **Database**: MongoDB Atlas
+- **Authentication**: JWT tokens with bcrypt hashing
+- **Deployment**: Vercel serverless functions
+- **CORS**: Configured for cross-origin requests
 
 ## Setup
 
