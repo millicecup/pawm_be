@@ -99,20 +99,20 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving (only for local auth)
-userSchema.pre('save', async function(next) {
-  // Only hash password if it exists and has been modified
-  if (!this.password || !this.isModified('password')) return next();
+// // Hash password before saving (only for local auth)
+// userSchema.pre('save', async function(next) {
+//   // Only hash password if it exists and has been modified
+//   if (!this.password || !this.isModified('password')) return next();
   
-  try {
-    // Hash password with cost of 12
-    const hashedPassword = await bcrypt.hash(this.password, 12);
-    this.password = hashedPassword;
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
+//   try {
+//     // Hash password with cost of 12
+//     const hashedPassword = await bcrypt.hash(this.password, 12);
+//     this.password = hashedPassword;
+//     next();
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 // Validate password requirement for local auth
 userSchema.pre('save', function(next) {
